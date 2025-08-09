@@ -134,6 +134,14 @@ local function render_menu(config)
     end
   end
 
+  -- In ui.lua's render_menu function:
+  local venv_status = ""
+  if package.loaded["venv-selector"] then
+    local venv = require("venv-selector").venv()
+    venv_status = venv and " (venv: "..vim.fn.fnamemodify(venv, ":t")..")" or ""
+  end
+  table.insert(lines, 1, "Work Session Manager"..venv_status)
+
 
   -- Footer with keybinds
   table.insert(lines, "")

@@ -14,13 +14,18 @@ M.default_config = {
     plugin = "linux-cultist/venv-selector.nvim",
     get_current = function()
       if package.loaded["venv-selector"] then
-        return require("venv-selector").get_active_venv() or ""
+        return require("venv-selector").venv() or ""
       end
       return ""
     end,
     set_current = function(venv)
       if package.loaded["venv-selector"] and venv and venv ~= "" then
-        require("venv-selector").activate_venv(venv)
+        require("venv-selector").activate_from_path(venv)
+      end
+    end,
+    deactivate = function()
+      if package.loaded["venv-selector"] then
+        require("venv-selector").deactivate()
       end
     end
   },

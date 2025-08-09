@@ -14,6 +14,12 @@ function M.setup(user_config)
       -- Initialize modules by passing config (no init() function needed)
       workspace.setup(M.config)
       session.setup(M.config)
+    
+      vim.api.nvim_create_user_command("WorkSessionDeactivateVenv", function()
+        if M.config.venv_selector then
+          M.config.venv_selector.deactivate()
+        end
+      end, {})
 
       return M
   end)
