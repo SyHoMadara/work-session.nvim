@@ -14,7 +14,6 @@ function M.setup(user_config)
       -- Initialize modules by passing config (no init() function needed)
       workspace.setup(M.config)
       session.setup(M.config)
-    
       vim.api.nvim_create_user_command("WorkSessionDeactivateVenv", function()
         if M.config.venv_selector then
           M.config.venv_selector.deactivate()
@@ -30,11 +29,23 @@ function M.setup(user_config)
 end
 
 function M.open_menu()
+  -- Ensure we have a valid config
+  if not M.config then
+    vim.notify("Work Session not configured. Please call setup() first.", vim.log.levels.ERROR)
+    return
+  end
+
+  -- Check for workspaces dependency
   if not package.loaded["workspaces"] then
     vim.notify("workspaces.nvim is required but not loaded", vim.log.levels.ERROR)
     return
   end
-  require("work_session.ui").create_main_menu(M.config)
+
+  -- Safely open menu
+  local ok, err = pcall(require("work_session.ui").create_main_menu, M.config)
+  if not ok then
+    vim.notify("Failed to open menu: " .. tostring(err), vim.log.levels.ERROR)
+  end
 end
 
 return M

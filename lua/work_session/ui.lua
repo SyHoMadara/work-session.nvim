@@ -17,33 +17,29 @@ local function close_window()
 end
 
 local function create_window(config)
-  local ui = config.ui
-  local width = ui.width
-  local height = ui.height
-  local border = ui.border
-  
-  -- Create buffer
+  -- Clear any existing window
+  if state.win and vim.api.nvim_win_is_valid(state.win) then
+    vim.api.nvim_win_close(state.win, true)
+  end
+
+  -- Create new buffer
   state.buf = vim.api.nvim_create_buf(false, true)
   
-  -- Get editor dimensions
-  local editor_width = vim.api.nvim_win_get_width(0)
-  local editor_height = vim.api.nvim_win_get_height(0)
-  
-  -- Calculate position
-  local col = (editor_width - width) / 2
-  local row = (editor_height - height) / 2
+  -- Window dimensions
+  local width = config.ui.width or 60
+  local height = config.ui.height or 20
   
   -- Create window
   state.win = vim.api.nvim_open_win(state.buf, true, {
     relative = "editor",
     width = width,
     height = height,
-    col = col,
-    row = row,
+    col = math.floor((vim.o.columns - width) / 2),
+    row = math.floor((vim.o.lines - height) / 3),
     style = "minimal",
-    border = border
+    border = config.ui.border or "rounded"
   })
-  
+
   -- Set window options
   vim.api.nvim_win_set_option(state.win, "number", false)
   vim.api.nvim_win_set_option(state.win, "relativenumber", false)
@@ -94,6 +90,14 @@ local function create_subwindow(content, title)
 end
 
 local function render_menu(config)
+  -- Check if buffer and window are valid
+  if not state.buf or not vim.api.nvim_buf_is_valid(state.buf) then return end
+  if not state.win or not vim.api.nvim_win_is_valid(state.win) then return end
+
+  -- Reset menu items
+  state.menu_items = {}
+
+  local lines = {}
   if not state.buf or not vim.api.nvim_buf_is_valid(state.buf) then return end
   
   local lines = {}
@@ -256,17 +260,31 @@ function M.close_window()
   close_window()
 end
 
-function M.create_main_menu(config)
+local function create_main_menu(config)
+  -- Initialize state if it doesn't exist
+  state = state or {
+    win = nil,
+    buf = nil,
+    menu_items = {},
+    current_selection = 1,
+    scroll_pos = 0
+  }
+
   -- Save current session before opening menu
   local session = require("work_session.session")
-  session.save_session(vim.fn.getcwd())
-  
+  local ok, err = pcall(session.save_session, vim.fn.getcwd())
+  if not ok then
+    vim.notify("Failed to save session: " .. tostring(err), vim.log.levels.ERROR)
+  end
+
   -- Create and render UI
   create_window(config)
   render_menu(config)
   
-  -- Set initial cursor position
-  vim.api.nvim_win_set_cursor(state.win, {state.menu_items[1].line + 1, 0})
+  -- Set initial cursor position if we have items
+  if state.menu_items and #state.menu_items > 0 then
+    vim.api.nvim_win_set_cursor(state.win, {state.menu_items[1].line + 1, 0})
+  end
 end
 
 local function setup_keymaps(config)
