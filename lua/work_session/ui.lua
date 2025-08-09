@@ -113,6 +113,32 @@ local function render_menu(config)
   local workspaces = workspace.get_workspaces()
   state.menu_items = {}
   
+  -- Build menu items first
+  local line_index = 4  -- Starting after header
+  for i, ws in ipairs(workspaces) do
+    table.insert(state.menu_items, {
+      type = "workspace",
+      name = ws.name,
+      path = ws.path,
+      line = line_index
+    })
+    line_index = line_index + 1
+  end
+  
+  -- Add action items
+  table.insert(state.menu_items, {
+    type = "action",
+    action = "add_dir",
+    line = line_index
+  })
+  line_index = line_index + 1
+  
+  table.insert(state.menu_items, {
+    type = "action", 
+    action = "remove_dir",
+    line = line_index
+  })
+  
    -- Calculate visible range based on scroll position
   state.scroll_pos = state.scroll_pos or 0
   local visible_lines = config.ui.height - 4  -- Account for header/footer
@@ -125,9 +151,8 @@ local function render_menu(config)
     state.scroll_pos = state.current_selection - visible_lines
   end
   
-  -- Add visible items only
-  for i = state.scroll_pos + 1, math.min(state.scroll_pos + visible_lines, total_items) do
-    local item = state.menu_items[i]
+  -- Add visible items to display
+  for i, item in ipairs(state.menu_items) do
     if item.type == "workspace" then
       table.insert(lines, string.format("%d. %s", i, item.name))
     elseif item.type == "action" then
@@ -260,6 +285,25 @@ function M.close_window()
   close_window()
 end
 
+local function setup_keymaps(config)
+  local keymaps = config.ui.keymaps
+  
+  -- Set keymaps
+  vim.keymap.set("n", keymaps.select, function() M.select_item() end, { buffer = state.buf, silent = true })
+  vim.keymap.set("n", keymaps.quit, function() M.close_window() end, { buffer = state.buf, silent = true })
+  vim.keymap.set("n", keymaps.up, function() M.navigate(-1) end, { buffer = state.buf, silent = true })
+  vim.keymap.set("n", keymaps.down, function() M.navigate(1) end, { buffer = state.buf, silent = true })
+  
+  -- Number keymaps for workspaces
+  for i = 1, 9 do
+    vim.keymap.set("n", tostring(i), function() M.select_by_number(i) end, { buffer = state.buf, silent = true })
+  end
+  
+  -- Action keymaps
+  vim.keymap.set("n", keymaps.add_dir, function() M.trigger_action("add_dir") end, { buffer = state.buf, silent = true })
+  vim.keymap.set("n", keymaps.remove_dir, function() M.trigger_action("remove_dir") end, { buffer = state.buf, silent = true })
+end
+
 local function create_main_menu(config)
   -- Initialize state if it doesn't exist
   state = state or {
@@ -280,36 +324,12 @@ local function create_main_menu(config)
   -- Create and render UI
   create_window(config)
   render_menu(config)
+  setup_keymaps(config)
   
   -- Set initial cursor position if we have items
   if state.menu_items and #state.menu_items > 0 then
     vim.api.nvim_win_set_cursor(state.win, {state.menu_items[1].line + 1, 0})
   end
-end
-
-local function setup_keymaps(config)
-  local keymaps = config.ui.keymaps
-  
-  -- Clear existing keymaps first
-  vim.api.nvim_buf_set_keymap(state.buf, "n", keymaps.select, "", {})
-  vim.api.nvim_buf_set_keymap(state.buf, "n", keymaps.quit, "", {})
-  vim.api.nvim_buf_set_keymap(state.buf, "n", keymaps.up, "", {})
-  vim.api.nvim_buf_set_keymap(state.buf, "n", keymaps.down, "", {})
-  
-  -- Set new keymaps
-  vim.keymap.set("n", keymaps.select, function() M.select_item() end, { buffer = state.buf, silent = true })
-  vim.keymap.set("n", keymaps.quit, function() M.close_window() end, { buffer = state.buf, silent = true })
-  vim.keymap.set("n", keymaps.up, function() M.navigate(-1) end, { buffer = state.buf, silent = true })
-  vim.keymap.set("n", keymaps.down, function() M.navigate(1) end, { buffer = state.buf, silent = true })
-  
-  -- Number keymaps for workspaces
-  for i = 1, 9 do
-    vim.keymap.set("n", tostring(i), function() M.select_by_number(i) end, { buffer = state.buf, silent = true })
-  end
-  
-  -- Action keymaps
-  vim.keymap.set("n", keymaps.add_dir, function() M.trigger_action("add_dir") end, { buffer = state.buf, silent = true })
-  vim.keymap.set("n", keymaps.remove_dir, function() M.trigger_action("remove_dir") end, { buffer = state.buf, silent = true })
 end
 
 function M.scroll_down()
@@ -329,5 +349,8 @@ function M.scroll_up()
     render_menu(require("work_session.config").default_config)
   end
 end
+
+-- Expose the create_main_menu function
+M.create_main_menu = create_main_menu
 
 return M
