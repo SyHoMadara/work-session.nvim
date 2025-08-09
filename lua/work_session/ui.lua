@@ -50,6 +50,36 @@ local function create_window(config)
   vim.api.nvim_win_set_option(state.win, "cursorline", true)
 end
 
+local function create_subwindow(content, title)
+  local width = math.floor(vim.o.columns * 0.8)
+  local height = math.floor(vim.o.lines * 0.8)
+  
+  local buf = vim.api.nvim_create_buf(false, true)
+  local win = vim.api.nvim_open_win(buf, true, {
+    relative = "editor",
+    width = width,
+    height = height,
+    col = math.floor((vim.o.columns - width) / 2),
+    row = math.floor((vim.o.lines - height) / 3),
+    style = "minimal",
+    border = "rounded"
+  })
+  
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, content)
+  vim.api.nvim_buf_set_option(buf, "modifiable", false)
+  
+  -- Add title
+  vim.api.nvim_buf_set_extmark(buf, -1, 0, 0, {
+    virt_text = {{title, "Title"}},
+    virt_text_pos = "right_align"
+  })
+  
+  return {
+    buf = buf,
+    win = win
+  }
+end
+
 local function render_menu(config)
   if not state.buf or not vim.api.nvim_buf_is_valid(state.buf) then return end
   
@@ -66,6 +96,11 @@ local function render_menu(config)
   local workspaces = workspace.get_workspaces()
   state.menu_items = {}
   
+  -- Reset current selection if out of bounds
+  if state.current_selection > #workspaces + 2 then -- +2 for action items
+    state.current_selection = 1
+  end
+
   for i, ws in ipairs(workspaces) do
     local prefix = i .. ". "
     table.insert(lines, prefix .. ws.name)
@@ -106,57 +141,32 @@ local function render_menu(config)
   vim.api.nvim_buf_set_lines(state.buf, 0, -1, false, lines)
   
   -- Highlight current selection
-  vim.api.nvim_buf_add_highlight(state.buf, -1, "CursorLine", state.current_selection, 0, -1)
-  
-  -- Set keymaps
-  local keymaps = config.ui.keymaps
-  vim.api.nvim_buf_set_keymap(state.buf, "n", keymaps.up, "<cmd>lua require('work_session.ui').navigate(-1)<CR>", {silent = true})
-  vim.api.nvim_buf_set_keymap(state.buf, "n", keymaps.down, "<cmd>lua require('work_session.ui').navigate(1)<CR>", {silent = true})
-  vim.api.nvim_buf_set_keymap(state.buf, "n", keymaps.select, "<cmd>lua require('work_session.ui').select_item()<CR>", {silent = true})
-  vim.api.nvim_buf_set_keymap(state.buf, "n", keymaps.quit, "<cmd>lua require('work_session.ui').close_window()<CR>", {silent = true})
-  
-  -- Number keymaps for workspaces
-  for i = 1, #workspaces do
-    vim.api.nvim_buf_set_keymap(state.buf, "n", tostring(i), 
-      "<cmd>lua require('work_session.ui').select_by_number(" .. i .. ")<CR>", 
-      {silent = true})
+  vim.api.nvim_buf_clear_namespace(state.buf, -1, 0, -1)
+  if state.current_selection > 0 and state.current_selection <= #state.menu_items then
+    vim.api.nvim_buf_add_highlight(
+      state.buf, 
+      -1, 
+      "CursorLine", 
+      state.menu_items[state.current_selection].line, 
+      0, 
+      -1
+    )
+    vim.api.nvim_win_set_cursor(state.win, {state.menu_items[state.current_selection].line + 1, 0})
   end
-  
-  -- Action keymaps
-  vim.api.nvim_buf_set_keymap(state.buf, "n", keymaps.add_dir, 
-    "<cmd>lua require('work_session.ui').trigger_action('add_dir')<CR>", 
-    {silent = true})
-    
-  vim.api.nvim_buf_set_keymap(state.buf, "n", keymaps.remove_dir, 
-    "<cmd>lua require('work_session.ui').trigger_action('remove_dir')<CR>", 
-    {silent = true})
 end
 
 function M.navigate(direction)
   if not state.win or not vim.api.nvim_win_is_valid(state.win) then return end
   
   local new_selection = state.current_selection + direction
-  if new_selection < 1 then new_selection = 1 end
-  if new_selection > #state.menu_items then new_selection = #state.menu_items end
+  if new_selection < 1 then 
+    new_selection = #state.menu_items  -- Wrap to bottom
+  elseif new_selection > #state.menu_items then 
+    new_selection = 1  -- Wrap to top
+  end
   
-  -- Clear previous highlight
-  vim.api.nvim_buf_clear_namespace(state.buf, -1, 0, -1)
-  
-  -- Update selection
   state.current_selection = new_selection
-  
-  -- Apply new highlight
-  vim.api.nvim_buf_add_highlight(
-    state.buf, 
-    -1, 
-    "CursorLine", 
-    state.menu_items[new_selection].line, 
-    0, 
-    -1
-  )
-  
-  -- Move cursor
-  vim.api.nvim_win_set_cursor(state.win, {state.menu_items[new_selection].line + 1, 0})
+  render_menu(require("work_session.config").default_config)
 end
 
 function M.select_item()
@@ -164,11 +174,43 @@ function M.select_item()
   local item = state.menu_items[state.current_selection]
   
   if item.type == "workspace" then
-    close_window()
-    workspace.open_workspace(item.name)
+    -- Show confirmation subwindow
+    local content = {
+      "Are you sure you want to open workspace:",
+      "",
+      "Name: " .. item.name,
+      "Path: " .. item.path,
+      "",
+      "Press <Enter> to confirm",
+      "Press <Esc> to cancel"
+    }
+    
+    local subwin = create_subwindow(content, "Confirm Workspace Open")
+    
+    vim.api.nvim_buf_set_keymap(subwin.buf, "n", "<CR>", 
+      "<cmd>lua require('work_session.ui')._confirm_open('"..item.name.."')<CR>", 
+      {silent = true})
+      
+    vim.api.nvim_buf_set_keymap(subwin.buf, "n", "<Esc>", 
+      "<cmd>lua require('work_session.ui')._close_subwindow()<CR>", 
+      {silent = true})
+      
   elseif item.type == "action" then
     M.trigger_action(item.action)
   end
+end
+
+function M._confirm_open(workspace_name)
+  M._close_subwindow()
+  close_window()
+  workspace.open_workspace(workspace_name)
+end
+
+function M._close_subwindow()
+  if state.subwin and vim.api.nvim_win_is_valid(state.subwin.win) then
+    vim.api.nvim_win_close(state.subwin.win, true)
+  end
+  state.subwin = nil
 end
 
 function M.select_by_number(num)
