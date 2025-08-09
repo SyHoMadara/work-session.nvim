@@ -30,9 +30,9 @@ function M.save_session(workspace_path)
   
   -- Save virtual environment if available
   local config = require("work_session.config").default_config
-  if config.venv_selector then
+  if config.venv_selector and config.venv_selector.get_current then
     local venv = config.venv_selector.get_current()
-    if venv then
+    if venv and venv ~= "" then
       local venv_file = session_path .. "/venv.txt"
       file = io.open(venv_file, "w")
       if file then
@@ -52,14 +52,14 @@ function M.restore_session(workspace_path)
   local file = io.open(buf_file, "r")
   if file then
     for line in file:lines() do
-      vim.cmd("e " .. line)
+      pcall(vim.cmd, "e " .. line)
     end
     file:close()
   end
   
   -- Restore virtual environment
   local config = require("work_session.config").default_config
-  if config.venv_selector then
+  if config.venv_selector and config.venv_selector.set_current then
     local venv_file = session_path .. "/venv.txt"
     file = io.open(venv_file, "r")
     if file then
