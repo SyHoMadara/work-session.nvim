@@ -1,30 +1,34 @@
 local M = {}
 
--- Properly initialize modules
-local config = require("work_session.config")
-local ui = require("work_session.ui")
-local workspace = require("work_session.workspace")
-local session = require("work_session.session")
-
 function M.setup(user_config)
-  -- Merge user config with defaults
-  M.config = vim.tbl_deep_extend("force", {}, config.default_config, user_config or {})
+  local ok, err = pcall(function()
+     -- Load modules only when needed
+      local config = require("work_session.config")
+      local ui = require("work_session.ui")
+      local workspace = require("work_session.workspace")
+      local session = require("work_session.session")
+
+      -- Merge configurations
+      M.config = vim.tbl_deep_extend("force", {}, config.default_config, user_config or {})
+
+      -- Initialize modules by passing config (no init() function needed)
+      workspace.setup(M.config)
+      session.setup(M.config)
+
+      return M
+  end)
   
-  -- Initialize submodules
-  workspace.init(M.config)
-  session.init(M.config)
-  
-  return M
+  if not ok then
+    vim.notify("Failed to setup work-session: " .. tostring(err), vim.log.levels.ERROR)
+  end
 end
 
 function M.open_menu()
-  -- Add safety checks
   if not package.loaded["workspaces"] then
-    vim.notify("workspaces.nvim not loaded", vim.log.levels.ERROR)
+    vim.notify("workspaces.nvim is required but not loaded", vim.log.levels.ERROR)
     return
   end
-  
-  ui.create_main_menu(M.config)
+  require("work_session.ui").create_main_menu(M.config)
 end
 
 return M

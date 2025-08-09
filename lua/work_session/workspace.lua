@@ -1,5 +1,9 @@
 local M = {}
 
+function M.setup(config)
+  M.config = config
+end
+
 function M.get_workspaces()
   local ok, workspaces = pcall(require, "workspaces")
   if not ok then return {} end

@@ -1,6 +1,10 @@
 local M = {}
 local uv = vim.loop
 
+function M.setup(config)
+  M.config = config
+end
+
 function M.save_session(workspace_path)
   local session_dir = require("work_session.config").default_config.session_dir
   local session_path = workspace_path .. "/" .. session_dir
