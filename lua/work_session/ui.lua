@@ -111,7 +111,7 @@ local function render_menu(config)
   
    -- Calculate visible range based on scroll position
   state.scroll_pos = state.scroll_pos or 0
-  local visible_lines = config.ui.height - 4  # Account for header/footer
+  local visible_lines = config.ui.height - 4  -- Account for header/footer
   local total_items = #state.menu_items
   
   -- Adjust scroll position if needed
@@ -150,7 +150,7 @@ local function render_menu(config)
       math.min(state.scroll_pos + visible_lines, total_items),
       total_items
     )
-    table.insert(lines, 3, scroll_info)  # Add after header
+    table.insert(lines, 3, scroll_info)  -- Add after header
   end
 
   -- Set buffer content

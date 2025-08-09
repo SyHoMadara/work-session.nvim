@@ -1,33 +1,33 @@
 local M = {}
 
 M.default_config = {
-  session_dir = ".work_session",  -- Directory to store session data
+  session_dir = ".work_session",
   workspaces = {
     plugin = "natecraddock/workspaces.nvim",
-    open = function(workspace) 
-      require("workspaces").open(workspace) 
+    open = function(workspace)
+      if package.loaded["workspaces"] then
+        return require("workspaces").open(workspace)
+      end
     end
   },
   venv_selector = {
     plugin = "linux-cultist/venv-selector.nvim",
     get_current = function()
-      local ok, venv = pcall(function()
+      if package.loaded["venv-selector"] then
         return require("venv-selector").get_active_venv() or ""
-      end)
-      return ok and venv or ""
+      end
+      return ""
     end,
     set_current = function(venv)
-      if venv and venv ~= "" then
-        pcall(function()
-          require("venv-selector").activate_venv(venv)
-        end)
+      if package.loaded["venv-selector"] and venv and venv ~= "" then
+        require("venv-selector").activate_venv(venv)
       end
     end
   },
   ui = {
     width = 60,
     height = 20,
-    border = "rounded",  -- or "single", "double", "shadow"
+    border = "rounded",
     keymaps = {
       select = "<Space>",
       quit = "<Esc>",
