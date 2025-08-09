@@ -56,7 +56,7 @@ use {
     "linux-cultist/venv-selector.nvim"
   },
   config = function()
-    require("work-session").setup()
+    require("work_session").setup()
   end
 }
 ```
@@ -136,6 +136,21 @@ Session data is automatically saved when you open the work session manager.
 - Requires workspaces.nvim to be installed and configured
 - Currently only supports Python virtual environments
 - Session restoration doesn't preserve window layouts (yet!)
+
+## Python Virtual Environment Support
+
+This plugin optionally integrates with [venv-selector.nvim](https://github.com/linux-cultist/venv-selector.nvim) for Python virtual environment management. If installed, it will:
+
+- Save the current virtual environment when saving a session
+- Restore the virtual environment when loading a session
+
+To disable this functionality, set `venv_selector = nil` in your config:
+
+```lua
+require("work_session").setup({
+  venv_selector = nil  -- Disable venv integration
+})
+```
 
 ## 💻 Development
 
