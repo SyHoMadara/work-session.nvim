@@ -10,11 +10,18 @@ M.default_config = {
   },
   venv_selector = {
     plugin = "linux-cultist/venv-selector.nvim",
-    get_current = function() 
-      return require("venv-selector").get_current_venv() 
+    get_current = function()
+      local ok, venv = pcall(function()
+        return require("venv-selector").get_active_venv() or ""
+      end)
+      return ok and venv or ""
     end,
-    set_current = function(venv) 
-      require("venv-selector").set_venv(venv) 
+    set_current = function(venv)
+      if venv and venv ~= "" then
+        pcall(function()
+          require("venv-selector").activate_venv(venv)
+        end)
+      end
     end
   },
   ui = {
