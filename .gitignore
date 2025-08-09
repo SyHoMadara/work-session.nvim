@@ -1,0 +1,39 @@
+# General development artifacts
+*.swp
+*.swo
+*~
+.*.swp
+.*.swo
+*.luac
+*.bak
+*.tmp
+*.log
+
+# Editor-specific files
+.vscode/
+.idea/
+*.iml
+
+# Build artifacts
+luac.out
+
+# Dependency directories
+deps/
+dependencies/
+
+# Documentation artifacts
+doc/tags
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Test artifacts
+test-results/
+*.output
+
+# LSP and analysis files
+.luacheckrc
+stylua.toml
+selene.toml
