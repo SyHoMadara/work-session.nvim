@@ -31,7 +31,7 @@ M.default_config = {
   },
   ui = {
     width = 60,
-    height = 20,
+    height = 25,
     border = "rounded",
     keymaps = {
       select = "<Space>",

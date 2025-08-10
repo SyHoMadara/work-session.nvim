@@ -51,41 +51,38 @@ local function create_window(config)
 end
 
 local function create_subwindow(content, title)
-  local width = math.floor(vim.o.columns * 0.6)
-  local height = math.floor(vim.o.lines * 0.6)
+  -- Calculate size based on content
+  local max_width = 0
+  for _, line in ipairs(content) do
+    max_width = math.max(max_width, #line)
+  end
+  
+  local width = math.max(max_width + 4, 30)  -- Minimum width of 30
+  local height = #content + 2  -- Add padding
   
   -- Create a scratch buffer
   local buf = vim.api.nvim_create_buf(false, true)
   
-  -- Create a parent window with fixed size
+  -- Create a centered window with appropriate size
   local win = vim.api.nvim_open_win(buf, true, {
     relative = "editor",
     width = width,
     height = height,
     col = math.floor((vim.o.columns - width) / 2),
-    row = math.floor((vim.o.lines - height) / 3),
+    row = math.floor((vim.o.lines - height) / 2),
     style = "minimal",
     border = "rounded",
     title = title,
     title_pos = "center"
   })
   
-  -- Set content with proper scrolling
+  -- Set content
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, content)
   vim.api.nvim_buf_set_option(buf, "modifiable", false)
   vim.api.nvim_buf_set_option(buf, "buftype", "nofile")
   vim.api.nvim_buf_set_option(buf, "swapfile", false)
-  vim.api.nvim_win_set_option(win, "wrap", false)
-  vim.api.nvim_win_set_option(win, "cursorline", true)
-  vim.api.nvim_win_set_option(win, "number", true)
-  
-  -- Enable scrolling
-  vim.keymap.set("n", "<Down>", "<C-e>", { buffer = buf, silent = true })
-  vim.keymap.set("n", "<Up>", "<C-y>", { buffer = buf, silent = true })
-  vim.keymap.set("n", "<PageDown>", "<C-f>", { buffer = buf, silent = true })
-  vim.keymap.set("n", "<PageUp>", "<C-b>", { buffer = buf, silent = true })
-  vim.keymap.set("n", "<C-d>", function() M.scroll_down() end, { buffer = state.buf, silent = true })
-  vim.keymap.set("n", "<C-u>", function() M.scroll_up() end, { buffer = state.buf, silent = true })
+  vim.api.nvim_win_set_option(win, "wrap", true)
+  vim.api.nvim_win_set_option(win, "cursorline", false)
   
   return {
     buf = buf,
@@ -165,8 +162,7 @@ local function render_menu(config)
   table.insert(lines, "")
   table.insert(lines, string.rep("-", config.ui.width or 60))
   local footer = "Select: " .. config.ui.keymaps.select .. "/" .. "<CR>"
-  footer = footer .. " | Navigate: j/k/" .. config.ui.keymaps.up .. "/" .. config.ui.keymaps.down
-  footer = footer .. " | Quick Open: 1-9 | Add: a | Remove: d | Quit: q/" .. config.ui.keymaps.quit
+  footer = footer .. " | Help: ? | Quit: q/" .. config.ui.keymaps.quit
   table.insert(lines, footer)
 
   -- Set buffer content
@@ -211,36 +207,71 @@ function M.select_item()
   local item = state.menu_items[state.current_selection]
   
   if item.type == "workspace" then
-    -- Show confirmation subwindow
+    -- Show simple confirmation dialog
     local content = {
-      "Are you sure you want to open workspace:",
+      "Open workspace: " .. item.name .. "?",
       "",
-      "Name: " .. item.name,
-      "Path: " .. item.path,
-      "",
-      "Press <Enter> to confirm",
-      "Press <Esc> to cancel"
+      "<Enter> Yes    <Esc> Cancel"
     }
     
-    local subwin = create_subwindow(content, "Confirm Workspace Open")
+    local subwin = create_subwindow(content, "Confirm Open")
     
-    vim.api.nvim_buf_set_keymap(subwin.buf, "n", "<CR>", 
-      "<cmd>lua require('work_session.ui')._confirm_open('"..item.name.."')<CR>", 
-      {silent = true})
+    vim.keymap.set("n", "<CR>", function()
+      M._close_subwindow()
+      close_window()
+      workspace.open_workspace(item.name)
+    end, { buffer = subwin.buf, silent = true })
       
-    vim.api.nvim_buf_set_keymap(subwin.buf, "n", "<Esc>", 
-      "<cmd>lua require('work_session.ui')._close_subwindow()<CR>", 
-      {silent = true})
+    vim.keymap.set("n", "<Esc>", function()
+      M._close_subwindow()
+    end, { buffer = subwin.buf, silent = true })
+    
+    -- Store subwin reference for proper cleanup
+    state.subwin = subwin
       
   elseif item.type == "action" then
     M.trigger_action(item.action)
   end
 end
 
-function M._confirm_open(workspace_name)
-  M._close_subwindow()
-  close_window()
-  workspace.open_workspace(workspace_name)
+function M.show_help()
+  local content = {
+    "Work Session Manager - Help",
+    string.rep("=", 40),
+    "",
+    "Navigation:",
+    "  j/k, ↑/↓    - Navigate menu",
+    "  <Space>/<CR> - Select item",
+    "  1-9          - Quick open workspace",
+    "",
+    "Actions:",
+    "  a            - Add current directory to workspaces",
+    "  d            - Remove current directory from workspaces",
+    "",
+    "Other:",
+    "  ?            - Show this help",
+    "  q/<Esc>      - Quit/Close",
+    "",
+    "Workspace Details:",
+    "  When opening a workspace, you'll see:",
+    "  - Workspace name and full path",
+    "  - Session restoration if available",
+    "",
+    "Press <Esc> to close this help"
+  }
+  
+  local subwin = create_subwindow(content, "Help")
+  
+  vim.keymap.set("n", "<Esc>", function()
+    M._close_subwindow()
+  end, { buffer = subwin.buf, silent = true })
+  
+  vim.keymap.set("n", "q", function()
+    M._close_subwindow()
+  end, { buffer = subwin.buf, silent = true })
+  
+  -- Store subwin reference
+  state.subwin = subwin
 end
 
 function M._close_subwindow()
@@ -301,6 +332,9 @@ local function setup_keymaps(config)
   vim.keymap.set("n", "a", function() M.trigger_action("add_dir") end, { buffer = state.buf, silent = true })
   vim.keymap.set("n", "d", function() M.trigger_action("remove_dir") end, { buffer = state.buf, silent = true })
   
+  -- Help keymap
+  vim.keymap.set("n", "?", function() M.show_help() end, { buffer = state.buf, silent = true })
+  
   -- Number keymaps for workspaces only (count actual workspaces)
   local workspace_count = 0
   for _, item in ipairs(state.menu_items or {}) do
@@ -339,24 +373,6 @@ local function create_main_menu(config)
   -- Set initial cursor position if we have items
   if state.menu_items and #state.menu_items > 0 then
     vim.api.nvim_win_set_cursor(state.win, {state.menu_items[1].line + 1, 0})
-  end
-end
-
-function M.scroll_down()
-  if not state.win then return end
-  local config = require("work_session.config").default_config
-  local visible_lines = config.ui.height - 4
-  if state.scroll_pos + visible_lines < #state.menu_items then
-    state.scroll_pos = state.scroll_pos + 1
-    render_menu(config)
-  end
-end
-
-function M.scroll_up()
-  if not state.win then return end
-  if state.scroll_pos > 0 then
-    state.scroll_pos = state.scroll_pos - 1
-    render_menu(require("work_session.config").default_config)
   end
 end
 
