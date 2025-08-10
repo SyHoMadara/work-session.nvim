@@ -31,6 +31,11 @@ function M.setup(user_config)
       workspace.setup(M.config)
       session.setup(M.config)
       
+      -- Setup auto-detection if enabled
+      if M.config.auto_detect and M.config.auto_detect.enabled then
+        workspace.setup_auto_detection()
+      end
+      
       -- Create user commands
       vim.api.nvim_create_user_command("WorkSession", function()
         M.open_menu()
@@ -58,6 +63,18 @@ function M.setup(user_config)
           M.config.venv_selector.deactivate()
         end
       end, { desc = "Deactivate current virtual environment" })
+      
+      vim.api.nvim_create_user_command("WorkSessionAutoDetect", function(opts)
+        local path = opts.args ~= "" and opts.args or vim.fn.getcwd()
+        local detected = workspace.auto_detect_and_restore_session(path)
+        if not detected then
+          vim.notify("No session data found in: " .. path, vim.log.levels.INFO)
+        end
+      end, { 
+        nargs = "?", 
+        complete = "dir",
+        desc = "Auto-detect and restore session from directory" 
+      })
 
       return M
   end)
