@@ -11,6 +11,22 @@ function M.setup(user_config)
       -- Merge configurations
       M.config = vim.tbl_deep_extend("force", {}, config.default_config, user_config or {})
 
+      -- Migration: handle old 'interval' config format
+      if M.config.auto_save and M.config.auto_save.interval then
+        -- Convert old interval format to new periodic format
+        if not M.config.auto_save.periodic then
+          M.config.auto_save.periodic = {}
+        end
+        if M.config.auto_save.interval > 0 then
+          M.config.auto_save.periodic.enabled = true
+          M.config.auto_save.periodic.interval = M.config.auto_save.interval * 1000 -- Convert seconds to milliseconds
+        else
+          M.config.auto_save.periodic.enabled = false
+        end
+        -- Remove the old interval field
+        M.config.auto_save.interval = nil
+      end
+
       -- Initialize modules by passing config (no init() function needed)
       workspace.setup(M.config)
       session.setup(M.config)

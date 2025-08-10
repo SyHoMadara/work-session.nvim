@@ -191,6 +191,43 @@ local function render_menu(config)
   })
   local remove_icon = config.ui.icons and config.ui.icons.remove or ""
   table.insert(lines, string.format("d. %sRemove current directory from workspaces", remove_icon))
+  line_index = line_index + 1
+
+  -- Auto-save toggle actions
+  table.insert(state.menu_items, {
+    type = "action",
+    action = "toggle_auto_save_exit",
+    line = line_index
+  })
+  local current_config = require("work_session").config
+  local exit_status = current_config.auto_save.on_exit and "ON" or "OFF"
+  table.insert(lines, string.format("e. 🔄 Toggle auto-save on exit [%s]", exit_status))
+  line_index = line_index + 1
+
+  table.insert(state.menu_items, {
+    type = "action", 
+    action = "toggle_auto_save_focus",
+    line = line_index
+  })
+  local focus_status = current_config.auto_save.on_focus_lost and "ON" or "OFF"
+  table.insert(lines, string.format("f. 🔄 Toggle auto-save on focus lost [%s]", focus_status))
+  line_index = line_index + 1
+
+  table.insert(state.menu_items, {
+    type = "action",
+    action = "toggle_auto_save_periodic", 
+    line = line_index
+  })
+  local periodic_status = current_config.auto_save.periodic.enabled and "ON" or "OFF"
+  table.insert(lines, string.format("p. 🔄 Toggle periodic auto-save [%s]", periodic_status))
+  line_index = line_index + 1
+
+  table.insert(state.menu_items, {
+    type = "action",
+    action = "save_session_now",
+    line = line_index  
+  })
+  table.insert(lines, "s. 💾 Save session now")
 
   -- Footer with keybinds
   table.insert(lines, "")
@@ -287,9 +324,15 @@ function M.show_help()
     "  <Space>/<CR> - Select item",
     "  1-9          - Quick open workspace",
     "",
-    "Actions:",
+    "Workspace Actions:",
     "  a            - Add current directory to workspaces",
     "  d            - Remove current directory from workspaces",
+    "",
+    "Session Actions:",
+    "  e            - Toggle auto-save on exit",
+    "  f            - Toggle auto-save on focus lost",
+    "  p            - Toggle periodic auto-save",
+    "  s            - Save session now",
     "",
     "Other:",
     "  ?            - Show this help",
@@ -299,6 +342,11 @@ function M.show_help()
     "  When opening a workspace, you'll see:",
     "  - Workspace name and full path",
     "  - Session restoration if available",
+    "",
+    "Auto-Save Features:",
+    "  - Toggle options show current status [ON/OFF]",
+    "  - Changes take effect immediately",
+    "  - Settings persist during session",
     "",
     "Press <Esc> to close this help"
   }
@@ -349,6 +397,30 @@ function M.trigger_action(action)
   elseif action == "remove_dir" then
     workspace.remove_current_dir()
     vim.notify("Current directory removed from workspaces", vim.log.levels.INFO)
+  elseif action == "toggle_auto_save_exit" then
+    local config = require("work_session").config
+    config.auto_save.on_exit = not config.auto_save.on_exit
+    local status = config.auto_save.on_exit and "enabled" or "disabled"
+    vim.notify("Auto-save on exit " .. status, vim.log.levels.INFO)
+    -- Reinitialize auto-save with new settings
+    require("work_session.session").setup_auto_save(config)
+  elseif action == "toggle_auto_save_focus" then
+    local config = require("work_session").config
+    config.auto_save.on_focus_lost = not config.auto_save.on_focus_lost
+    local status = config.auto_save.on_focus_lost and "enabled" or "disabled"
+    vim.notify("Auto-save on focus lost " .. status, vim.log.levels.INFO)
+    -- Reinitialize auto-save with new settings
+    require("work_session.session").setup_auto_save(config)
+  elseif action == "toggle_auto_save_periodic" then
+    local config = require("work_session").config
+    config.auto_save.periodic.enabled = not config.auto_save.periodic.enabled
+    local status = config.auto_save.periodic.enabled and "enabled" or "disabled"
+    vim.notify("Periodic auto-save " .. status, vim.log.levels.INFO)
+    -- Reinitialize auto-save with new settings
+    require("work_session.session").setup_auto_save(config)
+  elseif action == "save_session_now" then
+    require("work_session.session").save_current_session()
+    vim.notify("Session saved manually", vim.log.levels.INFO)
   end
 end
 
@@ -382,6 +454,12 @@ local function setup_keymaps(config)
   -- Action keymaps
   vim.keymap.set("n", keymaps.add_dir or "a", function() M.trigger_action("add_dir") end, { buffer = state.buf, silent = true })
   vim.keymap.set("n", keymaps.remove_dir or "d", function() M.trigger_action("remove_dir") end, { buffer = state.buf, silent = true })
+  
+  -- Auto-save toggle keymaps
+  vim.keymap.set("n", keymaps.toggle_auto_save_exit or "e", function() M.trigger_action("toggle_auto_save_exit") end, { buffer = state.buf, silent = true })
+  vim.keymap.set("n", keymaps.toggle_auto_save_focus or "f", function() M.trigger_action("toggle_auto_save_focus") end, { buffer = state.buf, silent = true })
+  vim.keymap.set("n", keymaps.toggle_auto_save_periodic or "p", function() M.trigger_action("toggle_auto_save_periodic") end, { buffer = state.buf, silent = true })
+  vim.keymap.set("n", keymaps.save_session_now or "s", function() M.trigger_action("save_session_now") end, { buffer = state.buf, silent = true })
   
   -- Help keymap
   vim.keymap.set("n", keymaps.help or "?", function() M.show_help() end, { buffer = state.buf, silent = true })

@@ -36,9 +36,9 @@ function M.setup_auto_save(config)
   end
   
   -- Periodic auto-save
-  if auto_save.interval and auto_save.interval > 0 then
+  if auto_save.periodic and auto_save.periodic.enabled and auto_save.periodic.interval > 0 then
     local timer = uv.new_timer()
-    timer:start(auto_save.interval * 1000, auto_save.interval * 1000, vim.schedule_wrap(function()
+    timer:start(auto_save.periodic.interval, auto_save.periodic.interval, vim.schedule_wrap(function()
       M.save_current_session()
     end))
   end

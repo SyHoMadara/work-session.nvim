@@ -8,7 +8,10 @@ M.default_config = {
     enabled = true,           -- Enable auto-save functionality
     on_exit = true,          -- Save session when exiting Neovim
     on_focus_lost = false,   -- Save session when Neovim loses focus
-    interval = 0,            -- Auto-save interval in seconds (0 = disabled)
+    periodic = {             -- Periodic auto-save settings
+      enabled = false,       -- Enable periodic auto-save
+      interval = 60000,      -- Auto-save interval in milliseconds (60 seconds)
+    },
   },
   
   workspaces = {
@@ -81,6 +84,11 @@ M.default_config = {
       help = "?",
       add_dir = "a",
       remove_dir = "d",
+      -- Auto-save toggle keymaps
+      toggle_auto_save_exit = "e",
+      toggle_auto_save_focus = "f", 
+      toggle_auto_save_periodic = "p",
+      save_session_now = "s",
       -- Alternative navigation keys
       nav_up = "k",
       nav_down = "j",
