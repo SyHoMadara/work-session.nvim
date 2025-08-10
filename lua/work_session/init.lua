@@ -75,6 +75,28 @@ function M.setup(user_config)
         complete = "dir",
         desc = "Auto-detect and restore session from directory" 
       })
+      
+      vim.api.nvim_create_user_command("WorkSessionDebugTree", function()
+        -- Enable debug mode temporarily
+        local old_debug = vim.g.work_session_debug
+        vim.g.work_session_debug = true
+        
+        -- Test nvim-tree detection
+        local session = require("work_session.session")
+        session.save_nvim_tree_state("/tmp/debug_test")
+        
+        -- Show current nvim-tree state
+        local has_nvim_tree, tree_view = pcall(require, "nvim-tree.view")
+        if has_nvim_tree and tree_view then
+          local is_visible = tree_view.is_visible and tree_view.is_visible() or false
+          vim.notify("Direct nvim-tree API check: is_visible=" .. tostring(is_visible), vim.log.levels.INFO)
+        else
+          vim.notify("nvim-tree.view not available", vim.log.levels.WARN)
+        end
+        
+        -- Restore debug mode
+        vim.g.work_session_debug = old_debug
+      end, { desc = "Debug nvim-tree state detection" })
 
       return M
   end)

@@ -231,15 +231,15 @@ function M.restore_nvim_tree_state(session_path)
   end
   
   local nvim_tree_state = {
-    is_open = false,
+    is_open = true,
     current_node = nil,
     expanded_nodes = {}
   }
-  
+  -- TODO fix later
   -- Read nvim-tree state
   for line in file:lines() do
     if line:match("^is_open=") then
-      nvim_tree_state.is_open = line:match("^is_open=(.+)") == "true"
+      nvim_tree_state.is_open = true --line:match("^is_open=(.+)") == "true"
     elseif line:match("^current_node=") then
       nvim_tree_state.current_node = line:match("^current_node=(.+)")
     elseif line:match("^expanded=") then
