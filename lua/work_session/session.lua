@@ -79,6 +79,11 @@ function M.save_session(workspace_path)
     end
   end
   
+  -- Debug output
+  if vim.g.work_session_debug then
+    vim.notify("Saving session to: " .. session_path .. " with " .. #buffers .. " buffers", vim.log.levels.INFO)
+  end
+  
   local buf_file = session_path .. "/buffers.txt"
   local file = io.open(buf_file, "w")
   if file then
@@ -126,11 +131,19 @@ function M.restore_session(workspace_path)
   local session_dir = require("work_session.config").default_config.session_dir
   local session_path = workspace_path .. "/" .. session_dir
   
+  -- Debug output
+  if vim.g.work_session_debug then
+    vim.notify("Attempting to restore session from: " .. session_path, vim.log.levels.INFO)
+  end
+  
   -- Check if session exists
   local buf_file = session_path .. "/buffers.txt"
   local file = io.open(buf_file, "r")
   if not file then
     -- No session to restore
+    if vim.g.work_session_debug then
+      vim.notify("No session file found at: " .. buf_file, vim.log.levels.INFO)
+    end
     return false
   end
   
@@ -149,9 +162,25 @@ function M.restore_session(workspace_path)
   local buffers_restored = 0
   for line in file:lines() do
     if line and line ~= "" then
-      local success = pcall(vim.cmd, "e " .. vim.fn.fnameescape(line))
-      if success then
-        buffers_restored = buffers_restored + 1
+      -- Handle both relative and absolute paths
+      local file_path = line
+      
+      -- If it's a relative path, make it relative to the workspace
+      if not vim.fn.fnamemodify(file_path, ":p"):match("^/") then
+        file_path = workspace_path .. "/" .. file_path
+      end
+      
+      -- Only try to open if file exists
+      if vim.fn.filereadable(file_path) == 1 then
+        local success = pcall(vim.cmd, "e " .. vim.fn.fnameescape(file_path))
+        if success then
+          buffers_restored = buffers_restored + 1
+        end
+      else
+        -- Debug info for missing files
+        if vim.g.work_session_debug then
+          vim.notify("Buffer file not found: " .. file_path, vim.log.levels.WARN)
+        end
       end
     end
   end

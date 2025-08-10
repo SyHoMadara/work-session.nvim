@@ -201,7 +201,7 @@ local function render_menu(config)
   })
   local current_config = require("work_session").config
   local exit_status = current_config.auto_save.on_exit and "ON" or "OFF"
-  table.insert(lines, string.format("e. 🔄 Toggle auto-save on exit [%s]", exit_status))
+  table.insert(lines, string.format("e.  Toggle auto-save on exit [%s]", exit_status))
   line_index = line_index + 1
 
   table.insert(state.menu_items, {
@@ -210,7 +210,7 @@ local function render_menu(config)
     line = line_index
   })
   local focus_status = current_config.auto_save.on_focus_lost and "ON" or "OFF"
-  table.insert(lines, string.format("f. 🔄 Toggle auto-save on focus lost [%s]", focus_status))
+  table.insert(lines, string.format("f.  Toggle auto-save on focus lost [%s]", focus_status))
   line_index = line_index + 1
 
   table.insert(state.menu_items, {
@@ -219,7 +219,7 @@ local function render_menu(config)
     line = line_index
   })
   local periodic_status = current_config.auto_save.periodic.enabled and "ON" or "OFF"
-  table.insert(lines, string.format("p. 🔄 Toggle periodic auto-save [%s]", periodic_status))
+  table.insert(lines, string.format("p.  Toggle periodic auto-save [%s]", periodic_status))
   line_index = line_index + 1
 
   table.insert(state.menu_items, {
@@ -227,7 +227,7 @@ local function render_menu(config)
     action = "save_session_now",
     line = line_index  
   })
-  table.insert(lines, "s. 💾 Save session now")
+  table.insert(lines, "s.  Save session now")
 
   -- Footer with keybinds
   table.insert(lines, "")
@@ -487,12 +487,8 @@ local function create_main_menu(config)
     scroll_pos = 0
   }
 
-  -- Save current session before opening menu
-  local session = require("work_session.session")
-  local ok, err = pcall(session.save_session, vim.fn.getcwd())
-  if not ok then
-    vim.notify("Failed to save session: " .. tostring(err), vim.log.levels.ERROR)
-  end
+  -- Don't save session here - it will be saved when actually switching workspaces
+  -- This prevents overwriting session files of the workspace we want to open
 
   -- Create and render UI
   create_window(config)
