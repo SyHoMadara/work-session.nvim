@@ -44,6 +44,10 @@ local function create_window(config)
   vim.api.nvim_win_set_option(state.win, "number", false)
   vim.api.nvim_win_set_option(state.win, "relativenumber", false)
   vim.api.nvim_win_set_option(state.win, "cursorline", true)
+  
+  -- Set buffer options to make it properly closeable (but keep it modifiable for now)
+  vim.api.nvim_buf_set_option(state.buf, "buftype", "nofile")
+  vim.api.nvim_buf_set_option(state.buf, "swapfile", false)
 end
 
 local function create_subwindow(content, title)
@@ -97,15 +101,20 @@ local function render_menu(config)
   -- Reset menu items
   state.menu_items = {}
 
-  local lines = {}
+  -- Check if buffer and window are valid
   if not state.buf or not vim.api.nvim_buf_is_valid(state.buf) then return end
-  
+  if not state.win or not vim.api.nvim_win_is_valid(state.win) then return end
+
   local lines = {}
-  local hl = {}
   
-  -- Header
-  table.insert(lines, "Work Session Manager")
-  table.insert(lines, string.rep("=", config.ui.width))
+  -- Header with venv status
+  local venv_status = ""
+  if package.loaded["venv-selector"] then
+    local venv = require("venv-selector").venv()
+    venv_status = venv and " (venv: "..vim.fn.fnamemodify(venv, ":t")..")" or ""
+  end
+  table.insert(lines, "Work Session Manager"..venv_status)
+  table.insert(lines, string.rep("=", config.ui.width or 60))
   table.insert(lines, "")
   
   -- Workspaces section
@@ -113,7 +122,7 @@ local function render_menu(config)
   local workspaces = workspace.get_workspaces()
   state.menu_items = {}
   
-  -- Build menu items first
+  -- Build menu items for workspaces only
   local line_index = 4  -- Starting after header
   for i, ws in ipairs(workspaces) do
     table.insert(state.menu_items, {
@@ -122,98 +131,76 @@ local function render_menu(config)
       path = ws.path,
       line = line_index
     })
+    table.insert(lines, string.format("%d. %s", i, ws.name))
     line_index = line_index + 1
   end
   
-  -- Add action items
+  -- Add separator and actions section
+  if #workspaces > 0 then
+    table.insert(lines, "")
+    table.insert(lines, string.rep("─", config.ui.width or 60))
+    line_index = line_index + 2
+  end
+  
+  table.insert(lines, "Actions:")
+  line_index = line_index + 1
+  
+  -- Add workspace management actions
   table.insert(state.menu_items, {
     type = "action",
     action = "add_dir",
     line = line_index
   })
+  table.insert(lines, string.format("a. Add current directory to workspaces"))
   line_index = line_index + 1
   
   table.insert(state.menu_items, {
-    type = "action", 
-    action = "remove_dir",
+    type = "action",
+    action = "remove_dir", 
     line = line_index
   })
-  
-   -- Calculate visible range based on scroll position
-  state.scroll_pos = state.scroll_pos or 0
-  local visible_lines = config.ui.height - 4  -- Account for header/footer
-  local total_items = #state.menu_items
-  
-  -- Adjust scroll position if needed
-  if state.current_selection < state.scroll_pos + 1 then
-    state.scroll_pos = state.current_selection - 1
-  elseif state.current_selection > state.scroll_pos + visible_lines then
-    state.scroll_pos = state.current_selection - visible_lines
-  end
-  
-  -- Add visible items to display
-  for i, item in ipairs(state.menu_items) do
-    if item.type == "workspace" then
-      table.insert(lines, string.format("%d. %s", i, item.name))
-    elseif item.type == "action" then
-      table.insert(lines, string.format("%s. %s", 
-        item.action == "add_dir" and "a" or "d",
-        item.action == "add_dir" and "Add current directory to workspaces" or "Remove current directory from workspaces"
-      ))
-    end
-  end
-
-  -- In ui.lua's render_menu function:
-  local venv_status = ""
-  if package.loaded["venv-selector"] then
-    local venv = require("venv-selector").venv()
-    venv_status = venv and " (venv: "..vim.fn.fnamemodify(venv, ":t")..")" or ""
-  end
-  table.insert(lines, 1, "Work Session Manager"..venv_status)
-
+  table.insert(lines, string.format("d. Remove current directory from workspaces"))
 
   -- Footer with keybinds
   table.insert(lines, "")
-  table.insert(lines, string.rep("-", config.ui.width))
-  local footer = "Select: " .. config.ui.keymaps.select
-  footer = footer .. " | Navigate: " .. config.ui.keymaps.up .. "/" .. config.ui.keymaps.down
-  footer = footer .. " | Quit: " .. config.ui.keymaps.quit
+  table.insert(lines, string.rep("-", config.ui.width or 60))
+  local footer = "Select: " .. config.ui.keymaps.select .. "/" .. "<CR>"
+  footer = footer .. " | Navigate: j/k/" .. config.ui.keymaps.up .. "/" .. config.ui.keymaps.down
+  footer = footer .. " | Quick Open: 1-9 | Add: a | Remove: d | Quit: q/" .. config.ui.keymaps.quit
   table.insert(lines, footer)
-  
-  -- Add scroll indicator if needed
-  if total_items > visible_lines then
-    local scroll_info = string.format(" [%d-%d/%d] ", 
-      state.scroll_pos + 1,
-      math.min(state.scroll_pos + visible_lines, total_items),
-      total_items
-    )
-    table.insert(lines, 3, scroll_info)  -- Add after header
-  end
 
   -- Set buffer content
+  vim.api.nvim_buf_set_option(state.buf, "modifiable", true)
   vim.api.nvim_buf_set_lines(state.buf, 0, -1, false, lines)
+  vim.api.nvim_buf_set_option(state.buf, "modifiable", false)
   
   -- Highlight current selection
   vim.api.nvim_buf_clear_namespace(state.buf, -1, 0, -1)
   if state.current_selection > 0 and state.current_selection <= #state.menu_items then
+    local current_item = state.menu_items[state.current_selection]
+    local highlight_line = current_item.line
     vim.api.nvim_buf_add_highlight(
       state.buf, 
       -1, 
       "CursorLine", 
-      state.menu_items[state.current_selection].line, 
+      highlight_line, 
       0, 
       -1
     )
-    vim.api.nvim_win_set_cursor(state.win, {state.menu_items[state.current_selection].line + 1, 0})
+    vim.api.nvim_win_set_cursor(state.win, {highlight_line + 1, 0})
   end
 end
 
 function M.navigate(direction)
   if not state.win or not vim.api.nvim_win_is_valid(state.win) then return end
+  if #state.menu_items == 0 then return end
   
   local new_selection = state.current_selection + direction
-  if new_selection < 1 then new_selection = #state.menu_items end
-  if new_selection > #state.menu_items then new_selection = 1 end
+  if new_selection < 1 then 
+    new_selection = #state.menu_items 
+  elseif new_selection > #state.menu_items then 
+    new_selection = 1 
+  end
   
   state.current_selection = new_selection
   render_menu(require("work_session.config").default_config)
@@ -264,9 +251,19 @@ function M._close_subwindow()
 end
 
 function M.select_by_number(num)
-  if num > #state.menu_items then return end
-  state.current_selection = num
-  M.select_item()
+  -- Only handle numbered workspaces (not actions)
+  local workspace_count = 0
+  for _, item in ipairs(state.menu_items) do
+    if item.type == "workspace" then
+      workspace_count = workspace_count + 1
+      if workspace_count == num then
+        -- Directly open the workspace without confirmation
+        close_window()
+        workspace.open_workspace(item.name)
+        return
+      end
+    end
+  end
 end
 
 function M.trigger_action(action)
@@ -294,14 +291,27 @@ local function setup_keymaps(config)
   vim.keymap.set("n", keymaps.up, function() M.navigate(-1) end, { buffer = state.buf, silent = true })
   vim.keymap.set("n", keymaps.down, function() M.navigate(1) end, { buffer = state.buf, silent = true })
   
-  -- Number keymaps for workspaces
-  for i = 1, 9 do
-    vim.keymap.set("n", tostring(i), function() M.select_by_number(i) end, { buffer = state.buf, silent = true })
+  -- Also support alternative keys for navigation
+  vim.keymap.set("n", "j", function() M.navigate(1) end, { buffer = state.buf, silent = true })
+  vim.keymap.set("n", "k", function() M.navigate(-1) end, { buffer = state.buf, silent = true })
+  vim.keymap.set("n", "<CR>", function() M.select_item() end, { buffer = state.buf, silent = true })
+  vim.keymap.set("n", "q", function() M.close_window() end, { buffer = state.buf, silent = true })
+  
+  -- Direct action keymaps (like lazygit)
+  vim.keymap.set("n", "a", function() M.trigger_action("add_dir") end, { buffer = state.buf, silent = true })
+  vim.keymap.set("n", "d", function() M.trigger_action("remove_dir") end, { buffer = state.buf, silent = true })
+  
+  -- Number keymaps for workspaces only (count actual workspaces)
+  local workspace_count = 0
+  for _, item in ipairs(state.menu_items or {}) do
+    if item.type == "workspace" then
+      workspace_count = workspace_count + 1
+    end
   end
   
-  -- Action keymaps
-  vim.keymap.set("n", keymaps.add_dir, function() M.trigger_action("add_dir") end, { buffer = state.buf, silent = true })
-  vim.keymap.set("n", keymaps.remove_dir, function() M.trigger_action("remove_dir") end, { buffer = state.buf, silent = true })
+  for i = 1, math.min(workspace_count, 9) do
+    vim.keymap.set("n", tostring(i), function() M.select_by_number(i) end, { buffer = state.buf, silent = true })
+  end
 end
 
 local function create_main_menu(config)
