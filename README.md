@@ -8,7 +8,8 @@
 ## ✨ Features
 
 - **🎯 Unified Workspace Management**: Seamless integration with `natecraddock/workspaces.nvim`
-- **💾 Session Persistence**: Automatic save/restore of open buffers and window state
+- **💾 Automatic Session Persistence**: Auto-save on exit, focus lost, or periodic intervals
+- **🔄 Manual Session Control**: Save/restore sessions on demand with commands
 - **🐍 Python Virtual Environment Support**: Integrates with `venv-selector.nvim`
 - **🎨 Fully Customizable UI**: Configure dimensions, colors, icons, and positioning
 - **⌨️ Intuitive Controls**: Keyboard-driven interface with vim-like navigation
@@ -16,6 +17,7 @@
 - **🚀 Quick Workspace Access**: Direct workspace opening with number keys (1-9)
 - **🎛️ Flexible Configuration**: Disable confirmations, customize keymaps, and more
 - **📁 Session Isolation**: Creates `.work_session` directories for clean organization
+- **📊 Session Information**: View session details and restoration status
 - **🔧 Smart Defaults**: Works out of the box with sensible configuration
 
 ## 📦 Installation
@@ -82,6 +84,14 @@ You can override any of these options in your setup:
 ```lua
 {
   session_dir = ".work_session",  -- Directory to store session data
+  
+  -- Auto-save configuration
+  auto_save = {
+    enabled = true,           -- Enable auto-save functionality
+    on_exit = true,          -- Save session when exiting Neovim
+    on_focus_lost = false,   -- Save session when Neovim loses focus
+    interval = 0,            -- Auto-save interval in seconds (0 = disabled)
+  },
   
   -- Workspace integration
   workspaces = {
@@ -203,7 +213,54 @@ require("work_session").setup({
 })
 ```
 
+#### Disable Auto-save
+```lua
+require("work_session").setup({
+  auto_save = {
+    enabled = false  -- Disable all auto-save functionality
+  }
+})
+```
+
+#### Custom Auto-save Behavior
+```lua
+require("work_session").setup({
+  auto_save = {
+    enabled = true,
+    on_exit = true,          -- Save on Neovim exit
+    on_focus_lost = true,    -- Save when losing focus
+    interval = 300,          -- Auto-save every 5 minutes
+  }
+})
+```
+
+#### Session Directory Customization
+```lua
+require("work_session").setup({
+  session_dir = ".my_sessions",  -- Custom session directory name
+  auto_save = {
+    on_exit = true,
+    interval = 600  -- Save every 10 minutes
+  }
+})
+```
+
 #### Custom Keymaps
+```lua
+require("work_session").setup({
+  ui = {
+    keymaps = {
+      select = "<Tab>",
+      quit = "q", 
+      up = "h",
+      down = "l",
+      help = "H",
+      add_dir = "+",
+      remove_dir = "-"
+    }
+  }
+})
+```
 ```lua
 require("work_session").setup({
   ui = {
@@ -229,6 +286,34 @@ require("work_session").setup({
    ```lua
    vim.keymap.set("n", "<leader>ws", "<cmd>WorkSession<CR>", {desc = "Open Work Session"})
    ```
+
+### Available Commands
+
+- **`:WorkSession`** - Open the session manager interface
+- **`:WorkSessionSave`** - Manually save current session
+- **`:WorkSessionRestore [path]`** - Restore session from path (defaults to current directory)
+- **`:WorkSessionInfo`** - Show session information for current directory
+- **`:WorkSessionDeactivateVenv`** - Deactivate current Python virtual environment
+
+### Session Management
+
+#### Automatic Saving
+Work Session automatically saves your session:
+- **On Exit**: When you quit Neovim (configurable)
+- **On Focus Lost**: When Neovim loses focus (optional)
+- **Periodic**: At regular intervals (optional)
+
+#### Manual Control
+```lua
+-- Save current session
+vim.keymap.set("n", "<leader>ss", "<cmd>WorkSessionSave<CR>", {desc = "Save Session"})
+
+-- Show session info
+vim.keymap.set("n", "<leader>si", "<cmd>WorkSessionInfo<CR>", {desc = "Session Info"})
+
+-- Restore session
+vim.keymap.set("n", "<leader>sr", "<cmd>WorkSessionRestore<CR>", {desc = "Restore Session"})
+```
 
 ### Interface Overview
 
@@ -287,11 +372,31 @@ Work Session automatically handles:
 
 ## 🧩 How It Works
 
-The plugin creates a `.work_session` directory in your project root with:
-- `buffers.txt`: List of open buffers to restore
-- `venv.txt`: Current Python virtual environment path (if applicable)
+The plugin creates a `.work_session` directory in your project root containing:
 
-Session data is automatically saved when you open the work session manager.
+### Session Files
+- **`buffers.txt`**: List of open file buffers (only real files, no terminals/help)
+- **`venv.txt`**: Current Python virtual environment path
+- **`cwd.txt`**: Working directory when session was saved
+- **`metadata.txt`**: Session metadata (save time, buffer count, Neovim version)
+
+### Auto-Save Behavior
+- **On Exit**: Automatically triggered when you quit Neovim
+- **On Focus Lost**: Saves when Neovim window loses focus (optional)
+- **Periodic**: Regular auto-save at configured intervals
+- **Manual**: Use `:WorkSessionSave` to save anytime
+
+### Session Restoration
+When opening a workspace or using `:WorkSessionRestore`:
+1. Changes to the saved working directory
+2. Opens all previously open file buffers
+3. Activates the saved Python virtual environment
+4. Displays restoration status notification
+
+### Smart Buffer Management
+- Only saves actual file buffers (excludes terminals, help files, etc.)
+- Uses relative paths when possible for portability
+- Handles file escaping for paths with spaces/special characters
 
 ## � Troubleshooting
 
@@ -323,6 +428,49 @@ ui = {
   width = math.min(50, vim.o.columns - 10),
   height = math.min(20, vim.o.lines - 10)
 }
+```
+
+#### Auto-Save Not Working
+Check auto-save configuration and status:
+```lua
+-- Check if auto-save is enabled
+:lua print(vim.inspect(require('work_session').config.auto_save))
+
+-- Verify autocmds are created
+:autocmd WorkSession
+
+-- Test manual save
+:WorkSessionSave
+```
+
+Common auto-save issues:
+- **Directory Permissions**: Ensure write access to project directory
+- **Workspace Detection**: Auto-save only works in recognized workspaces
+- **Buffer State**: Only file buffers are saved (terminals, help files excluded)
+
+#### Session Restoration Issues
+```lua
+-- Check session files exist
+:lua print(vim.fn.filereadable('.work_session/buffers.txt'))
+
+-- Verify session info
+:WorkSessionInfo
+
+-- Force restoration
+:WorkSessionRestore
+```
+
+#### Virtual Environment Problems
+```lua
+-- Check venv-selector availability
+:lua print(vim.fn.exists(':VenvSelect'))
+
+-- Verify current venv
+:VenvSelect
+
+-- Test venv saving
+:WorkSessionSave
+:lua print(vim.fn.readfile('.work_session/venv.txt'))
 ```
 
 #### Icons Not Displaying

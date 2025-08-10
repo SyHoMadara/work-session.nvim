@@ -2,6 +2,15 @@ local M = {}
 
 M.default_config = {
   session_dir = ".work_session",
+  
+  -- Auto-save configuration
+  auto_save = {
+    enabled = true,           -- Enable auto-save functionality
+    on_exit = true,          -- Save session when exiting Neovim
+    on_focus_lost = false,   -- Save session when Neovim loses focus
+    interval = 0,            -- Auto-save interval in seconds (0 = disabled)
+  },
+  
   workspaces = {
     plugin = "natecraddock/workspaces.nvim",
     open = function(workspace)
