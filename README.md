@@ -11,7 +11,6 @@
 - **💾 Automatic Session Persistence**: Auto-save on exit, focus lost, or periodic intervals
 - **🔄 Manual Session Control**: Save/restore sessions on demand with commands
 - **🔍 Auto-Detection**: Automatically detects and restores sessions when entering directories
-- **🌳 NvimTree State Persistence**: Save and restore nvim-tree open/closed state and expanded directories
 - **🐍 Python Virtual Environment Support**: Integrates with `venv-selector.nvim`
 - **🎨 Fully Customizable UI**: Configure dimensions, colors, icons, and positioning
 - **⌨️ Intuitive Controls**: Keyboard-driven interface with vim-like navigation
@@ -115,13 +114,6 @@ You can override any of these options in your setup:
     deactivate = function()
       require("venv-selector").deactivate()
     end
-  },
-  
-  -- NvimTree integration
-  nvim_tree = {
-    save_state = true,        -- Save nvim-tree open/closed state
-    save_expanded = true,     -- Save expanded directories
-    save_current_node = true, -- Save currently selected file/directory
   },
   
   -- Auto-detection of session data
@@ -406,7 +398,6 @@ The plugin creates a `.work_session` directory in your project root containing:
 - **`buffers.txt`**: List of open file buffers (only real files, no terminals/help)
 - **`venv.txt`**: Current Python virtual environment path
 - **`cwd.txt`**: Working directory when session was saved
-- **`nvim_tree.txt`**: NvimTree state (open/closed, expanded directories, current selection)
 - **`metadata.txt`**: Session metadata (save time, buffer count, Neovim version)
 
 ### Auto-Save Behavior
@@ -420,8 +411,7 @@ When opening a workspace, using `:WorkSessionRestore`, or through auto-detection
 1. Changes to the saved working directory
 2. Opens all previously open file buffers
 3. Activates the saved Python virtual environment
-4. Restores NvimTree state (open/closed, expanded directories, selected file)
-5. Displays restoration status notification
+4. Displays restoration status notification
 
 ### Auto-Detection Behavior
 - **Smart Detection**: Only activates when `.work_session` directory contains actual session files
@@ -555,38 +545,6 @@ To disable this functionality, set `venv_selector = nil` in your config:
 ```lua
 require("work_session").setup({
   venv_selector = nil  -- Disable venv integration
-})
-```
-
-## 🌳 NvimTree Integration
-
-This plugin integrates seamlessly with [nvim-tree.lua](https://github.com/nvim-tree/nvim-tree.lua) to preserve your file explorer state across sessions. If nvim-tree is installed, the plugin will:
-
-- **Save Open/Closed State**: Remember if nvim-tree was open when you saved the session
-- **Save Expanded Directories**: Preserve which directories were expanded in the tree view
-- **Save Current Selection**: Remember which file or directory was selected
-
-### Configuration
-
-```lua
-require("work_session").setup({
-  nvim_tree = {
-    save_state = true,        -- Save nvim-tree open/closed state
-    save_expanded = true,     -- Save expanded directories
-    save_current_node = true, -- Save currently selected file/directory
-  }
-})
-```
-
-### Disabling NvimTree Integration
-
-To disable nvim-tree integration completely:
-
-```lua
-require("work_session").setup({
-  nvim_tree = {
-    save_state = false,  -- Disable all nvim-tree integration
-  }
 })
 ```
 

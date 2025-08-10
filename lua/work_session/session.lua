@@ -115,9 +115,6 @@ function M.save_session(workspace_path)
     end
   end
   
-  -- Save nvim-tree state if available
-  M.save_nvim_tree_state(session_path)
-  
   -- Save session metadata
   local meta_file = session_path .. "/metadata.txt"
   local file = io.open(meta_file, "w")
@@ -128,155 +125,6 @@ function M.save_session(workspace_path)
     file:close()
   end
 
-end
-
-function M.save_nvim_tree_state(session_path)
-  -- Check configuration
-  local config = require("work_session.config").default_config
-  if not config.nvim_tree or not config.nvim_tree.save_state then
-    return
-  end
-  
-  -- Check if nvim-tree is available
-  local has_nvim_tree, nvim_tree_api = pcall(require, "nvim-tree.api")
-  if not has_nvim_tree then
-    return
-  end
-  
-  local nvim_tree_state = {
-    is_open = false,
-    current_node = nil,
-    expanded_nodes = {}
-  }
-  
-  -- Check if nvim-tree is currently open
-  local tree_wins = vim.fn.filter(vim.api.nvim_list_wins(), function(_, win)
-    local buf = vim.api.nvim_win_get_buf(win)
-    local ft = vim.api.nvim_buf_get_option(buf, 'filetype')
-    return ft == 'NvimTree'
-  end)
-  
-  nvim_tree_state.is_open = #tree_wins > 0
-  
-  -- If nvim-tree is open, get more detailed state
-  if nvim_tree_state.is_open then
-    -- Get current node under cursor (if enabled)
-    if config.nvim_tree.save_current_node then
-      local current_node = nvim_tree_api.tree.get_node_under_cursor()
-      if current_node then
-        nvim_tree_state.current_node = current_node.absolute_path
-      end
-    end
-    
-    -- Get expanded nodes (if enabled)
-    if config.nvim_tree.save_expanded then
-      local function collect_expanded_nodes(node, path)
-        if node.nodes then
-          for _, child in pairs(node.nodes) do
-            if child.open then
-              table.insert(nvim_tree_state.expanded_nodes, child.absolute_path)
-            end
-            if child.nodes then
-              collect_expanded_nodes(child, path .. "/" .. child.name)
-            end
-          end
-        end
-      end
-      
-      -- Get tree root and collect expanded nodes
-      local tree = nvim_tree_api.tree.get_nodes()
-      if tree then
-        collect_expanded_nodes({ nodes = tree }, "")
-      end
-    end
-  end
-  
-  -- Save nvim-tree state
-  local tree_file = session_path .. "/nvim_tree.txt"
-  local file = io.open(tree_file, "w")
-  if file then
-    file:write("is_open=" .. tostring(nvim_tree_state.is_open) .. "\n")
-    if nvim_tree_state.current_node then
-      file:write("current_node=" .. nvim_tree_state.current_node .. "\n")
-    end
-    for _, expanded_path in ipairs(nvim_tree_state.expanded_nodes) do
-      file:write("expanded=" .. expanded_path .. "\n")
-    end
-    file:close()
-    
-    if vim.g.work_session_debug then
-      vim.notify("Saved nvim-tree state: open=" .. tostring(nvim_tree_state.is_open) .. 
-                 ", expanded_nodes=" .. #nvim_tree_state.expanded_nodes, vim.log.levels.INFO)
-    end
-  end
-end
-
-function M.restore_nvim_tree_state(session_path)
-  -- Check configuration
-  local config = require("work_session.config").default_config
-  if not config.nvim_tree or not config.nvim_tree.save_state then
-    return
-  end
-  
-  -- Check if nvim-tree is available
-  local has_nvim_tree, nvim_tree_api = pcall(require, "nvim-tree.api")
-  if not has_nvim_tree then
-    return
-  end
-  
-  local tree_file = session_path .. "/nvim_tree.txt"
-  local file = io.open(tree_file, "r")
-  if not file then
-    return -- No nvim-tree state saved
-  end
-  
-  local nvim_tree_state = {
-    is_open = true,
-    current_node = nil,
-    expanded_nodes = {}
-  }
-  -- TODO fix later
-  -- Read nvim-tree state
-  for line in file:lines() do
-    if line:match("^is_open=") then
-      nvim_tree_state.is_open = true --line:match("^is_open=(.+)") == "true"
-    elseif line:match("^current_node=") then
-      nvim_tree_state.current_node = line:match("^current_node=(.+)")
-    elseif line:match("^expanded=") then
-      local expanded_path = line:match("^expanded=(.+)")
-      table.insert(nvim_tree_state.expanded_nodes, expanded_path)
-    end
-  end
-  file:close()
-  
-  -- Restore nvim-tree state
-  vim.schedule(function()
-    if nvim_tree_state.is_open then
-      -- Open nvim-tree if it was open
-      nvim_tree_api.tree.open()
-      
-      -- Expand previously expanded nodes
-      for _, expanded_path in ipairs(nvim_tree_state.expanded_nodes) do
-        if vim.fn.isdirectory(expanded_path) == 1 then
-          nvim_tree_api.tree.expand_all()
-          -- Note: More specific node expansion would require nvim-tree API updates
-        end
-      end
-      
-      -- Navigate to previously selected node if possible
-      if nvim_tree_state.current_node and vim.fn.filereadable(nvim_tree_state.current_node) == 1 then
-        nvim_tree_api.tree.find_file(nvim_tree_state.current_node)
-      end
-      
-      if vim.g.work_session_debug then
-        vim.notify("Restored nvim-tree state: opened with " .. #nvim_tree_state.expanded_nodes .. 
-                   " expanded nodes", vim.log.levels.INFO)
-      end
-    else
-      -- Close nvim-tree if it wasn't open
-      nvim_tree_api.tree.close()
-    end
-  end)
 end
 
 function M.restore_session(workspace_path)
@@ -357,9 +205,6 @@ function M.restore_session(workspace_path)
       end
     end
   end
-  
-  -- Restore nvim-tree state
-  M.restore_nvim_tree_state(session_path)
   
   -- Show restoration info
   if buffers_restored > 0 then

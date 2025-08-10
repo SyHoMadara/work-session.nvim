@@ -41,11 +41,6 @@ M.default_config = {
       end
     end
   },
-  nvim_tree = {
-    save_state = true,        -- Save nvim-tree open/closed state
-    save_expanded = true,     -- Save expanded directories
-    save_current_node = true, -- Save currently selected file/directory
-  },
   auto_detect = {
     enabled = true,           -- Enable auto-detection of session data
     on_startup = true,        -- Auto-restore session on Neovim startup
