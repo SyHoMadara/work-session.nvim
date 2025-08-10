@@ -27,15 +27,34 @@ local function create_window(config)
   
   -- Window dimensions
   local width = config.ui.width or 60
-  local height = config.ui.height or 20
+  local height = config.ui.height or 25
+  
+  -- Calculate position based on config
+  local col, row
+  local position = config.ui.position or "center"
+  
+  if position == "center" then
+    col = math.floor((vim.o.columns - width) / 2) + (config.ui.col_offset or 0)
+    row = math.floor((vim.o.lines - height) / 3) + (config.ui.row_offset or 0)
+  elseif position == "top" then
+    col = math.floor((vim.o.columns - width) / 2) + (config.ui.col_offset or 0)
+    row = 2 + (config.ui.row_offset or 0)
+  elseif position == "bottom" then
+    col = math.floor((vim.o.columns - width) / 2) + (config.ui.col_offset or 0)
+    row = vim.o.lines - height - 5 + (config.ui.row_offset or 0)
+  else
+    -- Default to center if invalid position
+    col = math.floor((vim.o.columns - width) / 2) + (config.ui.col_offset or 0)
+    row = math.floor((vim.o.lines - height) / 3) + (config.ui.row_offset or 0)
+  end
   
   -- Create window
   state.win = vim.api.nvim_open_win(state.buf, true, {
     relative = "editor",
     width = width,
     height = height,
-    col = math.floor((vim.o.columns - width) / 2),
-    row = math.floor((vim.o.lines - height) / 3),
+    col = col,
+    row = row,
     style = "minimal",
     border = config.ui.border or "rounded"
   })
@@ -44,6 +63,13 @@ local function create_window(config)
   vim.api.nvim_win_set_option(state.win, "number", false)
   vim.api.nvim_win_set_option(state.win, "relativenumber", false)
   vim.api.nvim_win_set_option(state.win, "cursorline", true)
+  
+  -- Set highlight groups if configured
+  if config.ui.highlight then
+    if config.ui.highlight.normal then
+      vim.api.nvim_win_set_option(state.win, "winhl", "Normal:" .. config.ui.highlight.normal)
+    end
+  end
   
   -- Set buffer options to make it properly closeable (but keep it modifiable for now)
   vim.api.nvim_buf_set_option(state.buf, "buftype", "nofile")
@@ -104,13 +130,14 @@ local function render_menu(config)
 
   local lines = {}
   
-  -- Header with venv status
-  local venv_status = ""
-  if package.loaded["venv-selector"] then
+  -- Header with venv status (if enabled)
+  local header = (config.ui.icons and config.ui.icons.workspace or "") .. "Work Session Manager"
+  if config.ui.show_venv_status ~= false and package.loaded["venv-selector"] then
     local venv = require("venv-selector").venv()
-    venv_status = venv and " (venv: "..vim.fn.fnamemodify(venv, ":t")..")" or ""
+    local venv_status = venv and " (venv: "..vim.fn.fnamemodify(venv, ":t")..")" or ""
+    header = header .. venv_status
   end
-  table.insert(lines, "Work Session Manager"..venv_status)
+  table.insert(lines, header)
   table.insert(lines, string.rep("=", config.ui.width or 60))
   table.insert(lines, "")
   
@@ -128,15 +155,20 @@ local function render_menu(config)
       path = ws.path,
       line = line_index
     })
-    table.insert(lines, string.format("%d. %s", i, ws.name))
+    local workspace_icon = config.ui.icons and config.ui.icons.workspace or ""
+    table.insert(lines, string.format("%d. %s%s", i, workspace_icon, ws.name))
     line_index = line_index + 1
   end
   
   -- Add separator and actions section
-  if #workspaces > 0 then
+  if #workspaces > 0 and config.ui.show_separator ~= false then
     table.insert(lines, "")
-    table.insert(lines, string.rep("─", config.ui.width or 60))
+    local sep_char = config.ui.separator_char or "─"
+    table.insert(lines, string.rep(sep_char, config.ui.width or 60))
     line_index = line_index + 2
+  elseif #workspaces > 0 then
+    table.insert(lines, "")
+    line_index = line_index + 1
   end
   
   table.insert(lines, "Actions:")
@@ -148,7 +180,8 @@ local function render_menu(config)
     action = "add_dir",
     line = line_index
   })
-  table.insert(lines, string.format("a. Add current directory to workspaces"))
+  local add_icon = config.ui.icons and config.ui.icons.add or ""
+  table.insert(lines, string.format("a. %sAdd current directory to workspaces", add_icon))
   line_index = line_index + 1
   
   table.insert(state.menu_items, {
@@ -156,7 +189,8 @@ local function render_menu(config)
     action = "remove_dir", 
     line = line_index
   })
-  table.insert(lines, string.format("d. Remove current directory from workspaces"))
+  local remove_icon = config.ui.icons and config.ui.icons.remove or ""
+  table.insert(lines, string.format("d. %sRemove current directory from workspaces", remove_icon))
 
   -- Footer with keybinds
   table.insert(lines, "")
@@ -205,9 +239,18 @@ end
 function M.select_item()
   if not state.win or #state.menu_items == 0 then return end
   local item = state.menu_items[state.current_selection]
+  local config = require("work_session.config").default_config
   
   if item.type == "workspace" then
-    -- Show simple confirmation dialog
+    -- Check if confirmation is enabled
+    if config.ui.confirm_workspace_open == false then
+      -- Direct open without confirmation
+      close_window()
+      workspace.open_workspace(item.name)
+      return
+    end
+    
+    -- Show confirmation dialog
     local content = {
       "Open workspace: " .. item.name .. "?",
       "",
@@ -316,24 +359,32 @@ end
 local function setup_keymaps(config)
   local keymaps = config.ui.keymaps
   
-  -- Set keymaps
-  vim.keymap.set("n", keymaps.select, function() M.select_item() end, { buffer = state.buf, silent = true })
-  vim.keymap.set("n", keymaps.quit, function() M.close_window() end, { buffer = state.buf, silent = true })
-  vim.keymap.set("n", keymaps.up, function() M.navigate(-1) end, { buffer = state.buf, silent = true })
-  vim.keymap.set("n", keymaps.down, function() M.navigate(1) end, { buffer = state.buf, silent = true })
+  -- Primary keymaps
+  vim.keymap.set("n", keymaps.select or "<Space>", function() M.select_item() end, { buffer = state.buf, silent = true })
+  vim.keymap.set("n", keymaps.quit or "<Esc>", function() M.close_window() end, { buffer = state.buf, silent = true })
+  vim.keymap.set("n", keymaps.up or "<Up>", function() M.navigate(-1) end, { buffer = state.buf, silent = true })
+  vim.keymap.set("n", keymaps.down or "<Down>", function() M.navigate(1) end, { buffer = state.buf, silent = true })
   
-  -- Also support alternative keys for navigation
-  vim.keymap.set("n", "j", function() M.navigate(1) end, { buffer = state.buf, silent = true })
-  vim.keymap.set("n", "k", function() M.navigate(-1) end, { buffer = state.buf, silent = true })
-  vim.keymap.set("n", "<CR>", function() M.select_item() end, { buffer = state.buf, silent = true })
-  vim.keymap.set("n", "q", function() M.close_window() end, { buffer = state.buf, silent = true })
+  -- Alternative keymaps
+  if keymaps.alt_select then
+    vim.keymap.set("n", keymaps.alt_select, function() M.select_item() end, { buffer = state.buf, silent = true })
+  end
+  if keymaps.alt_quit then
+    vim.keymap.set("n", keymaps.alt_quit, function() M.close_window() end, { buffer = state.buf, silent = true })
+  end
+  if keymaps.nav_up then
+    vim.keymap.set("n", keymaps.nav_up, function() M.navigate(-1) end, { buffer = state.buf, silent = true })
+  end
+  if keymaps.nav_down then
+    vim.keymap.set("n", keymaps.nav_down, function() M.navigate(1) end, { buffer = state.buf, silent = true })
+  end
   
-  -- Direct action keymaps (like lazygit)
-  vim.keymap.set("n", "a", function() M.trigger_action("add_dir") end, { buffer = state.buf, silent = true })
-  vim.keymap.set("n", "d", function() M.trigger_action("remove_dir") end, { buffer = state.buf, silent = true })
+  -- Action keymaps
+  vim.keymap.set("n", keymaps.add_dir or "a", function() M.trigger_action("add_dir") end, { buffer = state.buf, silent = true })
+  vim.keymap.set("n", keymaps.remove_dir or "d", function() M.trigger_action("remove_dir") end, { buffer = state.buf, silent = true })
   
   -- Help keymap
-  vim.keymap.set("n", "?", function() M.show_help() end, { buffer = state.buf, silent = true })
+  vim.keymap.set("n", keymaps.help or "?", function() M.show_help() end, { buffer = state.buf, silent = true })
   
   -- Number keymaps for workspaces only (count actual workspaces)
   local workspace_count = 0

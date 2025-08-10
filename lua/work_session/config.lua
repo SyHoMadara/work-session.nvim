@@ -30,17 +30,53 @@ M.default_config = {
     end
   },
   ui = {
+    -- Window dimensions
     width = 60,
     height = 25,
-    border = "rounded",
+    border = "rounded", -- "rounded", "single", "double", "shadow", "none"
+    
+    -- Window positioning
+    position = "center", -- "center", "top", "bottom"
+    row_offset = 0, -- Additional row offset from position
+    col_offset = 0, -- Additional column offset from position
+    
+    -- Colors and styling
+    highlight = {
+      normal = "Normal", -- Background highlight group
+      border = "FloatBorder", -- Border highlight group
+      title = "FloatTitle", -- Title highlight group
+      selected = "CursorLine", -- Selected item highlight
+      separator = "Comment", -- Separator line highlight
+    },
+    
+    -- Visual elements
+    show_venv_status = true, -- Show virtual environment in title
+    show_separator = true, -- Show separator between sections
+    separator_char = "─", -- Character used for separator
+    confirm_workspace_open = true, -- Show confirmation before opening workspace
+    
+    -- Icons (optional, fallback to text if not available)
+    icons = {
+      workspace = "󰉋 ", -- Workspace icon
+      add = "+ ", -- Add action icon
+      remove = "- ", -- Remove action icon
+      help = "? ", -- Help icon
+    },
+    
+    -- Keymaps
     keymaps = {
       select = "<Space>",
       quit = "<Esc>",
       up = "<Up>",
       down = "<Down>",
-      number_select = "<number>",
+      help = "?",
       add_dir = "a",
-      remove_dir = "d"
+      remove_dir = "d",
+      -- Alternative navigation keys
+      nav_up = "k",
+      nav_down = "j",
+      alt_select = "<CR>",
+      alt_quit = "q"
     }
   }
 }

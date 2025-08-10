@@ -7,12 +7,16 @@
 
 ## ✨ Features
 
-- **Unified Workspace Management**: List, open, add, and remove workspaces using `natecraddock/workspaces.nvim`
-- **Session Persistence**: Automatically saves and restores open buffers
-- **Virtual Environment Support**: Integrates with `venv-selector.nvim` for Python workflows
-- **Intuitive Popup UI**: Keyboard-driven interface with clear navigation
-- **Session Isolation**: Creates `.work_session` directories to store session data
-- **Customizable**: Configure UI dimensions, borders, and key mappings
+- **🎯 Unified Workspace Management**: Seamless integration with `natecraddock/workspaces.nvim`
+- **💾 Session Persistence**: Automatic save/restore of open buffers and window state
+- **🐍 Python Virtual Environment Support**: Integrates with `venv-selector.nvim`
+- **🎨 Fully Customizable UI**: Configure dimensions, colors, icons, and positioning
+- **⌨️ Intuitive Controls**: Keyboard-driven interface with vim-like navigation
+- **❓ Built-in Help System**: Comprehensive help accessible with `?` key
+- **🚀 Quick Workspace Access**: Direct workspace opening with number keys (1-9)
+- **🎛️ Flexible Configuration**: Disable confirmations, customize keymaps, and more
+- **📁 Session Isolation**: Creates `.work_session` directories for clean organization
+- **🔧 Smart Defaults**: Works out of the box with sensible configuration
 
 ## 📦 Installation
 
@@ -63,65 +67,223 @@ use {
 
 ## ⚙️ Configuration
 
-Default configuration (you can override any of these options):
+### Basic Setup
+
+```lua
+require("work_session").setup({
+  -- Custom configuration (all options are optional)
+})
+```
+
+### Default Configuration
+
+You can override any of these options in your setup:
 
 ```lua
 {
   session_dir = ".work_session",  -- Directory to store session data
+  
+  -- Workspace integration
   workspaces = {
     plugin = "natecraddock/workspaces.nvim",
     open = function(workspace) 
       require("workspaces").open(workspace) 
     end
   },
+  
+  -- Virtual environment integration
   venv_selector = {
     plugin = "linux-cultist/venv-selector.nvim",
     get_current = function() 
-      return require("venv-selector").get_current_venv() 
+      return require("venv-selector").venv() or ""
     end,
     set_current = function(venv) 
-      require("venv-selector").set_venv(venv) 
+      require("venv-selector").activate_from_path(venv) 
+    end,
+    deactivate = function()
+      require("venv-selector").deactivate()
     end
   },
+  
+  -- UI Configuration
   ui = {
-    width = 60,        -- Popup width
-    height = 20,       -- Popup height
-    border = "rounded",-- Border style: "single", "double", "rounded", "solid", "shadow"
+    -- Window dimensions
+    width = 60,
+    height = 25,
+    border = "rounded", -- "rounded", "single", "double", "shadow", "none"
+    
+    -- Window positioning
+    position = "center", -- "center", "top", "bottom"
+    row_offset = 0,      -- Additional row offset from position
+    col_offset = 0,      -- Additional column offset from position
+    
+    -- Colors and styling
+    highlight = {
+      normal = "Normal",      -- Background highlight group
+      border = "FloatBorder", -- Border highlight group
+      title = "FloatTitle",   -- Title highlight group
+      selected = "CursorLine", -- Selected item highlight
+      separator = "Comment",   -- Separator line highlight
+    },
+    
+    -- Visual elements
+    show_venv_status = true,            -- Show virtual environment in title
+    show_separator = true,              -- Show separator between sections
+    separator_char = "─",               -- Character used for separator
+    confirm_workspace_open = true,      -- Show confirmation before opening workspace
+    
+    -- Icons (optional, fallback to text if not available)
+    icons = {
+      workspace = "󰉋 ", -- Workspace icon (requires nerd fonts)
+      add = "+ ",       -- Add action icon
+      remove = "- ",    -- Remove action icon
+      help = "? ",      -- Help icon
+    },
+    
+    -- Keymaps
     keymaps = {
-      select = "<Space>",  -- Select item
-      quit = "<Esc>",      -- Close window
-      up = "<Up>",         -- Navigate up
-      down = "<Down>",     -- Navigate down
-      add_dir = "a",       -- Add current directory
-      remove_dir = "d"     -- Remove current directory
+      select = "<Space>",
+      quit = "<Esc>",
+      up = "<Up>",
+      down = "<Down>",
+      help = "?",
+      add_dir = "a",
+      remove_dir = "d",
+      -- Alternative navigation keys
+      nav_up = "k",        -- Vim-style up
+      nav_down = "j",      -- Vim-style down
+      alt_select = "<CR>", -- Alternative select key
+      alt_quit = "q"       -- Alternative quit key
     }
   }
 }
 ```
 
+### Configuration Examples
+
+#### Minimal Configuration
+```lua
+require("work_session").setup({
+  ui = {
+    width = 50,
+    height = 20
+  }
+})
+```
+
+#### Custom Styling
+```lua
+require("work_session").setup({
+  ui = {
+    border = "double",
+    position = "top",
+    separator_char = "═",
+    highlight = {
+      normal = "NormalFloat",
+      border = "TelescopeBorder",
+      selected = "Visual"
+    },
+    icons = {
+      workspace = "📁 ",
+      add = "➕ ",
+      remove = "❌ "
+    }
+  }
+})
+```
+
+#### Disable Confirmations
+```lua
+require("work_session").setup({
+  ui = {
+    confirm_workspace_open = false, -- Open workspaces directly
+    show_venv_status = false,       -- Hide venv in title
+    show_separator = false          -- Remove separator line
+  }
+})
+```
+
+#### Custom Keymaps
+```lua
+require("work_session").setup({
+  ui = {
+    keymaps = {
+      select = "<Tab>",
+      quit = "q",
+      up = "h",
+      down = "l",
+      help = "H",
+      add_dir = "+",
+      remove_dir = "-"
+    }
+  }
+})
+```
+
 ## 🎮 Usage
 
-1. Open the work session manager:
+### Opening Work Session Manager
+
+1. **Command**: `:WorkSession`
+2. **Keymap**: Set up a convenient mapping:
+   ```lua
+   vim.keymap.set("n", "<leader>ws", "<cmd>WorkSession<CR>", {desc = "Open Work Session"})
    ```
-   :WorkSession
-   ```
-   or use your mapped key (e.g., `<leader>ws`)
 
-2. The interactive menu will show:
-   - All available workspaces (select with numbers or navigation keys)
-   - Action options: Add/Remove current directory
+### Interface Overview
 
-3. Navigation:
-   - Use arrow keys or j/k to navigate
-   - Press <Space> to select an item
-   - Use number keys to directly select a workspace
-   - Press 'a' to add current directory
-   - Press 'd' to remove current directory
-   - Press <Esc> to close the window
+The interactive menu displays:
+- **Header**: Shows "Work Session Manager" with optional virtual environment status
+- **Workspaces**: Numbered list of available workspaces
+- **Separator**: Visual divider between sections (configurable)
+- **Actions**: Add/Remove current directory options
+- **Footer**: Shows available keybindings and help
 
-4. When opening a workspace:
-   - All previously open buffers will be restored
-   - Python virtual environment will be activated if previously set
+### Navigation & Controls
+
+#### Basic Navigation
+- **Arrow Keys / j,k**: Navigate up/down through items
+- **Space / Enter**: Select highlighted item
+- **Esc / q**: Close the window
+- **? (Question Mark)**: Show comprehensive help window
+
+#### Quick Actions
+- **Number Keys (1-9)**: Directly open workspace by number
+- **a**: Add current directory to workspaces
+- **d**: Remove current directory from workspaces
+
+#### Workspace Opening
+When selecting a workspace:
+- **With Confirmation** (default): Shows confirmation dialog
+- **Direct Opening**: Set `confirm_workspace_open = false` for instant opening
+- **Session Restoration**: Automatically restores previously open buffers
+- **Virtual Environment**: Activates the previously used Python environment
+
+### Help System
+
+Press **?** in the main menu to access the built-in help system, which includes:
+- Complete list of keybindings
+- Navigation instructions
+- Workspace management details
+- Usage tips and shortcuts
+
+### Session Management
+
+Work Session automatically handles:
+1. **Saving**: When you open the session manager, current state is saved
+2. **Restoring**: When opening a workspace, previous session is restored
+3. **Virtual Environments**: Python venv state is preserved across sessions
+
+### Example Workflow
+
+```
+1. Open project directory: cd ~/projects/my-app
+2. Open session manager: <leader>ws
+3. Add to workspaces: press 'a'
+4. Work on project...
+5. Switch to another project: <leader>ws → select workspace
+6. Return later: <leader>ws → workspace is restored exactly as left
+```
 
 ## 🧩 How It Works
 
@@ -131,11 +293,71 @@ The plugin creates a `.work_session` directory in your project root with:
 
 Session data is automatically saved when you open the work session manager.
 
-## 🚧 Limitations
+## � Troubleshooting
 
-- Requires workspaces.nvim to be installed and configured
-- Currently only supports Python virtual environments
-- Session restoration doesn't preserve window layouts (yet!)
+### Common Issues
+
+#### Plugin Not Loading
+```lua
+-- Ensure dependencies are properly loaded
+require("workspaces").setup() -- Must be called before work-session
+require("work_session").setup()
+```
+
+#### Keymaps Not Working
+- Check for keymap conflicts with other plugins
+- Verify configuration syntax:
+```lua
+ui = {
+  keymaps = {
+    select = "<Space>", -- Correct
+    -- select = "Space", -- Incorrect (missing angle brackets)
+  }
+}
+```
+
+#### UI Positioning Issues
+```lua
+-- For small terminals, adjust dimensions
+ui = {
+  width = math.min(50, vim.o.columns - 10),
+  height = math.min(20, vim.o.lines - 10)
+}
+```
+
+#### Icons Not Displaying
+- Install a [Nerd Font](https://www.nerdfonts.com/)
+- Or disable icons:
+```lua
+ui = {
+  icons = {
+    workspace = "",
+    add = "",
+    remove = "",
+    help = ""
+  }
+}
+```
+
+### Debug Mode
+Enable verbose logging to troubleshoot issues:
+```lua
+vim.g.work_session_debug = true
+```
+
+### Reset Configuration
+To reset to defaults, remove custom config:
+```lua
+require("work_session").setup() -- No parameters = all defaults
+```
+
+## �🚧 Limitations
+
+- **Dependency Requirement**: Requires `workspaces.nvim` to be installed and configured
+- **Python Environment Support**: Virtual environment integration limited to `venv-selector.nvim`
+- **Window Layout**: Session restoration doesn't preserve complex window layouts (planned feature)
+- **Terminal Sessions**: Terminal buffers and their state are not preserved
+- **Cross-Platform**: Path handling optimized for Unix-like systems (Windows support planned)
 
 ## Python Virtual Environment Support
 
